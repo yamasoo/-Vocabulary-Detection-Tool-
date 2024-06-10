@@ -1,0 +1,122 @@
+import os
+import re
+import shutil
+import tkinter as tk
+from tkinter import filedialog, messagebox
+
+def process_files(files, positive_words, negative_words, output_directory):
+    # 生成輸出的檔名，將逗號替換為底線
+    output_filename = "_".join(positive_words) + ".txt"
+    
+    # 確保檔案名稱最後不會有下劃線
+    if output_filename.endswith("_.txt"):
+        output_filename = output_filename[:-5] + ".txt"
+
+    # 如果目錄不存在，創建目錄
+    if not os.path.exists(output_directory):
+        os.makedirs(output_directory)
+    
+    # 準備輸出的檔案
+    temp_output_filename = "temp_" + output_filename
+    with open(temp_output_filename, 'w', encoding='utf-8') as outfile:
+        # 瀏覽選擇的所有檔案
+        for filename in files:
+            try:
+                with open(filename, 'r', encoding='utf-8') as infile:
+                    # 處理每一行
+                    for line in infile:
+                        # 檢查行是否包含所有的正面輸入單詞且不包含任何反面輸入單詞
+                        if all(re.search(r'\b{}\b'.format(re.escape(word)), line) for word in positive_words) and not any(re.search(r'\b{}\b'.format(re.escape(word)), line) for word in negative_words):
+                            # 將符合條件的行寫入輸出檔案
+                            outfile.write(line)
+            except Exception as e:
+                print(f"無法讀取檔案 {filename}: {e}")
+    
+    # 將臨時檔案移動到目標目錄
+    final_output_path = os.path.join(output_directory, output_filename)
+    shutil.move(temp_output_filename, final_output_path)
+    
+    messagebox.showinfo("完成", f"符合條件的行已寫入檔案 {final_output_path}")
+
+def on_process():
+    input_positive_words = positive_entry.get()
+    positive_words = [word.strip() for word in input_positive_words.split(",")]
+    
+    input_negative_words = negative_entry.get()
+    negative_words = [word.strip() for word in input_negative_words.split(",") if word.strip()]
+
+    # 檢查正面單詞是否輸入
+    if not positive_words:
+        messagebox.showerror("錯誤", "正面單詞必須輸入")
+        return
+    
+    # 檢查正面單詞是否超過十個
+    if len(positive_words) > 10:
+        messagebox.showerror("錯誤", "正面單詞不能超過十個")
+        return
+    
+    output_directory = output_dir_entry.get().strip()
+    
+    # 如果沒有輸入，使用預設目錄
+    if not output_directory:
+        output_directory = r"I:\sd-forge\extensions\sd-dynamic-prompts\wildcards"
+
+    input_files = files_entry.get().strip().split(",")
+    files = [file.strip() for file in input_files if file.strip()]
+
+    # 如果沒有輸入檔案，使用當前目錄下的所有純文字檔案
+    if not files:
+        files = [filename for filename in os.listdir('.') if filename.endswith('.txt')]
+    
+    process_files(files, positive_words, negative_words, output_directory)
+
+def browse_files():
+    files = filedialog.askopenfilenames(filetypes=[("Text files", "*.txt")])
+    if files:
+        files_entry.delete(0, tk.END)
+        files_entry.insert(0, ",".join(files))
+
+def browse_directory():
+    directory = filedialog.askdirectory()
+    if directory:
+        output_dir_entry.delete(0, tk.END)
+        output_dir_entry.insert(0, directory)
+
+# 創建主窗口
+root = tk.Tk()
+root.title("詞彙檢測工具")
+
+# 正面詞彙框
+tk.Label(root, text="請輸入正面單詞(最多十個單詞，用逗號分隔):").pack(pady=5)
+positive_entry = tk.Entry(root, width=50)
+positive_entry.pack(pady=5)
+
+# 反面詞彙框
+tk.Label(root, text="請輸入反面單詞(可選，用逗號分隔):").pack(pady=5)
+negative_entry = tk.Entry(root, width=50)
+negative_entry.pack(pady=5)
+
+# 輸入檔案框
+tk.Label(root, text="請輸入純文字檔案(用逗號分隔)或選擇檔案:").pack(pady=5)
+files_entry = tk.Entry(root, width=50)
+files_entry.pack(pady=5)
+
+# 瀏覽檔案按鈕
+browse_files_button = tk.Button(root, text="瀏覽...", command=browse_files)
+browse_files_button.pack(pady=5)
+
+# 輸出目錄框
+tk.Label(root, text="請輸入輸出目錄（如果不存在，將會自動創建）:").pack(pady=5)
+output_dir_entry = tk.Entry(root, width=50)
+output_dir_entry.pack(pady=5)
+
+# 瀏覽目錄按鈕
+browse_button = tk.Button(root, text="瀏覽...", command=browse_directory)
+browse_button.pack(pady=5)
+
+# 開始處理按鈕
+process_button = tk.Button(root, text="開始處理", command=on_process)
+process_button.pack(pady=20)
+
+# 運行主循環
+root.mainloop()
